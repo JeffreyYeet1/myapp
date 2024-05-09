@@ -28,4 +28,37 @@ class FirestoreService {
     var snapshot = await ref.get();
     return Quiz.fromJson(snapshot.data() ?? {} );
   }
+
+  // Stream for listener to user report document
+  Stream<Report> streamReport() {
+    // Switch map is an rxdart extention that allows you to listen to one stream and then switch to another stream
+    return AuthService().userStream.switchMap((user) {
+      if(user!=null) {
+        var ref = _db.collection('reports').doc(user.uid);
+        return ref.snapshots().map((doc) => Report.fromJson(doc.data()!));
+      } else {
+        return Stream.fromIterable([Report()]);
+      }
+    });
+  }
+
+  // Updates the current user's report document after submitting a quiz
+  Future<void> updateUserReport(Quiz quiz){
+    var user = AuthService().user!;
+    var ref = _db.collection('reports').doc(user.uid);
+
+    var data = {
+      'total': FieldValue.increment(1),
+      'topics': {
+        // Map with a key of quiz topic and the value is the array of quiz ids taken for that topic
+        quiz.topic: FieldValue.arrayUnion([quiz.id])
+      }
+    };
+
+    // Can write to the data base using ref.set(data). setoptions(merge: true) makes it so that
+    // this does not overwrite any existing data
+    return ref.set(data, SetOptions(merge: true));
+  }
+
 }
+
